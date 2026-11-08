@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Escudo circular reutilizável para times.
 /// Substitui _buildShield e _buildTeam duplicados.
 class TeamShield extends StatelessWidget {
-  final String name;
   final String escudo;
   final double size;
 
   const TeamShield({
     super.key,
-    required this.name,
     required this.escudo,
-    this.size = 40,
+    this.size = 70,
   });
 
   @override
@@ -20,12 +18,16 @@ class TeamShield extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      //   decoration: BoxDecoration(
-      //     color: color,
-      //     shape: BoxShape.circle,
-      //     border: Border.all(color: Colors.white30, width: 2),
-      //   ),
-      child: Center(child: Image.network(escudo)),
+      decoration: BoxDecoration(
+        shape: BoxShape.rectangle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ClipOval(
+        child: SvgPicture.network(
+          escudo,
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }

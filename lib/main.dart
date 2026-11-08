@@ -7,22 +7,20 @@ import 'screens/home_screen.dart';
 import 'screens/challenge_screen.dart';
 import 'screens/profile_screen.dart';
 
-void main() async {
-  await DotEnv().load(fileName: '.env');
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
 
-  ChangeNotifierProvider(
-    create: (_) => SoccerMatches(),
-    child: const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Bet Bola',
-      home: HomeScreen(),
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => SoccerMatches(),
+      child: const BetNaBolaApp(),
     ),
   );
 }
 
 class BetNaBolaApp extends StatelessWidget {
   const BetNaBolaApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
