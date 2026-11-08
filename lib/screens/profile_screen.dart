@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/services/user_service.dart';
+import 'results_screen.dart';
 
 /// Tela de Perfil — Vinicius
 class ProfileScreen extends StatefulWidget {
@@ -106,18 +107,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Uri.parse('http://10.0.2.2:8080/api/bets/check-results'),
         headers: {'X-User-Id': userId},
       );
+
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Resultados conferidos! Vá para a tela de histórico.')),
+            const SnackBar(content: Text('Resultados conferidos!')),
+          );
+          // NAVEGA PARA A TELA DE HISTÓRICO
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ResultsScreen()),
           );
         }
       } else {
-        // ADICIONE ESTE PRINT AQUI
-        print('ERRO DO SERVIDOR: ${response.statusCode} - ${response.body}');
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Erro ao conferir resultados.')),
@@ -125,8 +127,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      print('ERRO DE CONEXÃO FLUTTER: $e');
-      // ...
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Falha de conexão com o servidor.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

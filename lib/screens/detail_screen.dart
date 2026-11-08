@@ -4,6 +4,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/team_shield.dart';
+import 'package:http/http.dart' as http;
+import '../../core/services/user_service.dart';
+import 'dart:convert';
 
 /// Tela de Detalhe da Partida — Matheus
 class DetailScreen extends StatefulWidget {
@@ -141,15 +144,48 @@ class _DetailScreenState extends State<DetailScreen> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Seu palpite foi salvo!')),
-          );
+        onPressed: () async {
+          // Mapeia a string da tela para o padrão do banco ('casa', 'empate', 'fora')
+          String previsaoFormatada = 'casa';
+          if (selectedBet == 'Empate') previsaoFormatada = 'empate';
+          if (selectedBet == 'Visitante') previsaoFormatada = 'fora';
 
-          Navigator.pop(context);
+          final userId = await UserService.getUserId();
+
+          try {
+            final response = await http.post(
+              Uri.parse('http://10.0.2.2:8080/api/bets'),
+              headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': userId,
+              },
+              body: jsonEncode({
+                'partida_id': widget.match.partidaId,
+                'previsao': previsaoFormatada,
+              }),
+            );
+
+            if (response.statusCode == 200) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Palpite salvo com sucesso!')),
+                );
+                Navigator.pop(context); // Volta para a Home após salvar
+              }
+            } else {
+              final erro = jsonDecode(response.body)['error'];
+              throw Exception(erro);
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Erro: ${e.toString()}')),
+              );
+            }
+          }
         },
         child: Text('Apostar em $selectedBet',
-            style: TextStyle(
+            style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),
