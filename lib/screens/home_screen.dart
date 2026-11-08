@@ -1,16 +1,41 @@
+import 'package:betbola/core/theme/app_colors.dart';
+import 'package:betbola/core/theme/app_styles.dart';
+import 'package:betbola/core/widgets/team_shield.dart';
+import 'package:betbola/models/partida.dart';
+import 'package:betbola/models/soccer_matches.dart';
+import 'package:betbola/screens/detail_screen.dart';
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_styles.dart';
-import '../../core/widgets/team_shield.dart';
-import '../../models/game.dart';
-import 'detail_screen.dart';
+import 'package:provider/provider.dart';
 
 /// Tela de Partidas (Home) — Daniel
-class HomeScreen extends StatelessWidget {
+///
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SoccerMatches>().init();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final matches = context.watch<SoccerMatches>();
+
+    if (matches.carregando) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (matches.erro != null) {
+      return Center(child: Text(matches.erro!));
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.background,
@@ -39,6 +64,7 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
       body: Padding(
+
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,16 +75,16 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Expanded(
               child: ListView.builder(
-                itemCount: Game.mockGames.length,
+                itemCount: matches.length,
                 itemBuilder: (context, index) {
-                  final game = Game.mockGames[index];
+                  final match = matches.getMatchById(index);
                   return _GameCard(
-                    game: game,
+                    match: matches.getMatchById(index),
                     isFeatured: index == 0,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => DetailScreen(game: game)),
+                          builder: (_) => DetailScreen(match: match)),
                     ),
                   );
                 },
@@ -113,12 +139,12 @@ class HomeScreen extends StatelessWidget {
 
 /// Card de partida isolado — permite const e evita rebuild do card inteiro.
 class _GameCard extends StatelessWidget {
-  final Game game;
+  final Partida match;
   final bool isFeatured;
   final VoidCallback onTap;
 
   const _GameCard({
-    required this.game,
+    required this.match,
     required this.isFeatured,
     required this.onTap,
   });
@@ -137,7 +163,7 @@ class _GameCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(game.date,
+                  Text(match.dataRealizacao,
                       style: const TextStyle(
                           color: AppColors.textSecondary, fontSize: 12)),
                   if (isFeatured)
@@ -154,10 +180,12 @@ class _GameCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(game.home,
+                  Text(match.timeMandante.nomePopular,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
-                  TeamShield(name: game.home, color: game.homeColor),
+                  TeamShield(
+                      name: match.timeMandante.sigla,
+                      escudo: match.timeMandante.escudo),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Text('X',
@@ -165,9 +193,11 @@ class _GameCard extends StatelessWidget {
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.bold)),
                   ),
-                  TeamShield(name: game.away, color: game.awayColor),
+                  TeamShield(
+                      name: match.timeVisitante.sigla,
+                      escudo: match.timeVisitante.escudo),
                   const SizedBox(width: 8),
-                  Text(game.away,
+                  Text(match.timeVisitante.nomePopular,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),

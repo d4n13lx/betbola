@@ -5,37 +5,27 @@ import '../theme/app_colors.dart';
 /// Substitui _buildShield e _buildTeam duplicados.
 class TeamShield extends StatelessWidget {
   final String name;
-  final Color color;
+  final String escudo;
   final double size;
 
   const TeamShield({
     super.key,
     required this.name,
-    required this.color,
+    required this.escudo,
     this.size = 40,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isLight = color == AppColors.teamWhite;
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white30, width: 2),
-      ),
-      child: Center(
-        child: Text(
-          name.isNotEmpty ? name[0] : '?',
-          style: TextStyle(
-            fontSize: size * 0.6,
-            fontWeight: FontWeight.bold,
-            color: isLight ? Colors.black : Colors.white,
-          ),
-        ),
-      ),
+      //   decoration: BoxDecoration(
+      //     color: color,
+      //     shape: BoxShape.circle,
+      //     border: Border.all(color: Colors.white30, width: 2),
+      //   ),
+      child: Center(child: Image.network(escudo)),
     );
   }
 }

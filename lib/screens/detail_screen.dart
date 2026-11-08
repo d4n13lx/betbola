@@ -1,14 +1,14 @@
+import 'package:betbola/models/partida.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/team_shield.dart';
-import '../../models/game.dart';
 
 /// Tela de Detalhe da Partida — Matheus
 class DetailScreen extends StatefulWidget {
-  final Game game;
-  const DetailScreen({super.key, required this.game});
+  final Partida match;
+  const DetailScreen({super.key, required this.match});
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -60,8 +60,8 @@ class _DetailScreenState extends State<DetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _TeamInfo(
-                  name: widget.game.home,
-                  color: widget.game.homeColor,
+                  name: widget.match.timeMandante.nomePopular,
+                  escudo: widget.match.timeMandante.escudo,
                   type: 'Mandante'),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -74,8 +74,8 @@ class _DetailScreenState extends State<DetailScreen> {
                         color: AppColors.primary, fontWeight: FontWeight.bold)),
               ),
               _TeamInfo(
-                  name: widget.game.away,
-                  color: widget.game.awayColor,
+                  name: widget.match.timeVisitante.nomePopular,
+                  escudo: widget.match.timeVisitante.escudo,
                   type: 'Visitante'),
             ],
           ),
@@ -125,7 +125,7 @@ class _DetailScreenState extends State<DetailScreen> {
       children: [
         const Text('Seu palpite',
             style: TextStyle(color: AppColors.textSecondary)),
-        Text('$selectedBet: ${widget.game.home}',
+        Text('$selectedBet: ${widget.match.timeMandante.nomePopular}',
             style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
@@ -155,17 +155,17 @@ class _DetailScreenState extends State<DetailScreen> {
 
 class _TeamInfo extends StatelessWidget {
   final String name;
-  final Color color;
+  final String escudo;
   final String type;
 
   const _TeamInfo(
-      {required this.name, required this.color, required this.type});
+      {required this.name, required this.escudo, required this.type});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TeamShield(name: name, color: color, size: 60),
+        TeamShield(name: name, escudo: escudo, size: 60),
         const SizedBox(height: 8),
         Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(type,
