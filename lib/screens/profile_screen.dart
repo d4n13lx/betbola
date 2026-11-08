@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
 import '../../core/widgets/app_card.dart';
-import 'results_screen.dart';
+import '../../core/services/user_service.dart';
 
 /// Tela de Perfil — Vinicius
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -75,21 +83,51 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ResultsScreen()),
-                  );
-                },
-                child: const Text('Conferir Resultados',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+                onPressed: _isLoading ? null : _conferirResultados,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Conferir Resultados',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _conferirResultados() async {
+    setState(() => _isLoading = true);
+    final userId = await UserService.getUserId();
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:8080/api/bets/check-results'),
+        headers: {'X-User-Id': userId},
+      );
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Resultados conferidos! Vá para a tela de histórico.')),
+          );
+        }
+      } else {
+        // ADICIONE ESTE PRINT AQUI
+        print('ERRO DO SERVIDOR: ${response.statusCode} - ${response.body}');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro ao conferir resultados.')),
+          );
+        }
+      }
+    } catch (e) {
+      print('ERRO DE CONEXÃO FLUTTER: $e');
+      // ...
+    }
   }
 
   Widget _buildStatCard(String label, String value, String sub, Color color) {

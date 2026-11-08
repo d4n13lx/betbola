@@ -145,11 +145,14 @@ class _DetailScreenState extends State<DetailScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Seu palpite foi salvo!')),
           );
-          
+
           Navigator.pop(context);
         },
         child: Text('Apostar em $selectedBet',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+            style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
       ),
     );
   }
