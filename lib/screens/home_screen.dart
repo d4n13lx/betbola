@@ -85,15 +85,34 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView.builder(
                 itemCount: matches.length,
                 itemBuilder: (context, index) {
-                  final match = matches.getMatchById(index);
+                  final match = matches.getMatchByIndex(index);
+
+                  // Busca no Provider se existe aposta para o ID deste jogo
+                  final palpiteSalvo = matches.bets[match.id];
+
                   return _GameCard(
-                    match: matches.getMatchById(index),
+                    match: match,
                     isFeatured: index == 0,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => DetailScreen(match: match)),
-                    ),
+                    currentBet: palpiteSalvo, // Passa o palpite para o card
+                    onTap: () async {
+                      // Aguarda a DetailScreen fechar e retornar o resultado
+                      final selectedBet = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => DetailScreen(
+                                  match: match,
+                                  currentBet:
+                                      palpiteSalvo, // PASSE O PALPITE AQUI
+                                )),
+                      );
+
+                      // Se o usuário selecionou uma aposta, salva no Provider
+                      if (selectedBet != null && context.mounted) {
+                        context
+                            .read<SoccerMatches>()
+                            .saveBet(match.id, selectedBet);
+                      }
+                    },
                   );
                 },
               ),
@@ -150,11 +169,13 @@ class _GameCard extends StatelessWidget {
   final Partida match;
   final bool isFeatured;
   final VoidCallback onTap;
+  final String? currentBet; // O palpite salvo
 
   const _GameCard({
     required this.match,
     required this.isFeatured,
     required this.onTap,
+    this.currentBet,
   });
 
   @override
@@ -193,7 +214,6 @@ class _GameCard extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Flexible evita erro de overflow se o nome do time for muito grande
                         Flexible(
                           child: Text(
                             match.timeMandante.nomePopular,
@@ -240,15 +260,28 @@ class _GameCard extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: AppColors.border)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Toque para dar seu palpite ',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
-                  Text('→',
-                      style: TextStyle(color: AppColors.primary, fontSize: 12)),
-                ],
+                // Verifica se há palpite salvo para definir qual texto mostrar
+                children: currentBet != null
+                    ? [
+                        const Text('Seu palpite: ',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12)),
+                        Text(currentBet!,
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold)),
+                      ]
+                    : const [
+                        Text('Toque para dar seu palpite ',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12)),
+                        Text('→',
+                            style: TextStyle(
+                                color: AppColors.primary, fontSize: 12)),
+                      ],
               ),
             ),
           ],

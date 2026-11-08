@@ -8,16 +8,26 @@ import '../../core/widgets/team_shield.dart';
 /// Tela de Detalhe da Partida — Matheus
 class DetailScreen extends StatefulWidget {
   final Partida match;
-  const DetailScreen({super.key, required this.match});
+  final String? currentBet; // 1. NOVA VARIÁVEL AQUI
+
+  const DetailScreen({super.key, required this.match, this.currentBet});
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
 }
 
 class _DetailScreenState extends State<DetailScreen> {
-  String selectedBet = 'Mandante';
+  late String
+      selectedBet; // 2. Mude para 'late' em vez de iniciar com 'Mandante'
 
   static const List<String> _betOptions = ['Mandante', 'Empate', 'Visitante'];
+
+  @override
+  void initState() {
+    super.initState();
+    // 3. Se currentBet tiver valor, usa ele. Se for nulo, o padrão é 'Mandante'.
+    selectedBet = widget.currentBet ?? 'Mandante';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -146,10 +156,11 @@ class _DetailScreenState extends State<DetailScreen> {
             const SnackBar(content: Text('Seu palpite foi salvo!')),
           );
 
-          Navigator.pop(context);
+          // AQUI: Envia o selectedBet de volta para a HomeScreen!
+          Navigator.pop(context, selectedBet);
         },
         child: Text('Apostar em $selectedBet',
-            style: TextStyle(
+            style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),

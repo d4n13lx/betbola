@@ -95,7 +95,7 @@ class ResultsScreen extends StatelessWidget {
                 separatorBuilder: (_, __) =>
                     const Divider(color: AppColors.border),
                 itemBuilder: (context, index) {
-                  final item = matches.getMatchById(index);
+                  final item = matches.getMatchByIndex(index);
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Container(
