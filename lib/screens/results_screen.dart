@@ -1,7 +1,8 @@
+import 'package:betbola/models/soccer_matches.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
-import '../../models/bet_history.dart';
 
 /// Tela de Estatísticas e Resultados — Pedro
 class ResultsScreen extends StatelessWidget {
@@ -9,6 +10,8 @@ class ResultsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final matches = context.watch<SoccerMatches>();
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.background,
@@ -79,7 +82,7 @@ class ResultsScreen extends StatelessWidget {
                     border: Border.all(color: AppColors.borderLight),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text('${BetHistory.mockHistory.length} jogos',
+                  child: Text('${matches.length} jogos',
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
                 ),
@@ -88,39 +91,42 @@ class ResultsScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Expanded(
               child: ListView.separated(
-                itemCount: BetHistory.mockHistory.length,
+                itemCount: matches.length,
                 separatorBuilder: (_, __) =>
                     const Divider(color: AppColors.border),
                 itemBuilder: (context, index) {
-                  final item = BetHistory.mockHistory[index];
+                  final item = matches.getMatchById(index);
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        // ✅ era .withOpacity(0.1)
-                        color: (item.success
-                                ? AppColors.primary
-                                : AppColors.danger)
-                            .withValues(alpha: 0.1),
+                        // TODO: Descomentar e corrigir o erro
+                        // color: (item.success
+                        //         ? AppColors.primary
+                        //         : AppColors.danger)
+                        //     .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(
-                        item.success ? Icons.check : Icons.close,
-                        color:
-                            item.success ? AppColors.primary : AppColors.danger,
-                      ),
+
+                      // TODO: Descomentar e corrigir o erro
+                      // child: Icon(
+                      //   item.success ? Icons.check : Icons.close,
+                      //   color:
+                      //       item.success ? AppColors.primary : AppColors.danger,
+                      // ),
                     ),
-                    title: Text(item.game,
+                    title: Text('${item.timeMandante} x ${item.timeVisitante}',
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text('${item.bet} • Placar ${item.result}',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 12)),
-                    trailing: Text('${item.points} pts',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.white)),
+                    // TODO: Descomentar e corrigir
+                    // subtitle: Text('${item.bet} • Placar ${item.placar}',
+                    //     style: const TextStyle(
+                    //         color: AppColors.textSecondary, fontSize: 12)),
+                    // trailing: Text('${item.points} pts',
+                    //     style: const TextStyle(
+                    //         fontWeight: FontWeight.bold, color: Colors.white)),
                   );
                 },
               ),

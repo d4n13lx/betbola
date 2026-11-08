@@ -1,10 +1,24 @@
+import 'package:betbola/models/soccer_matches.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'core/theme/app_colors.dart';
 import 'screens/home_screen.dart';
 import 'screens/challenge_screen.dart';
 import 'screens/profile_screen.dart';
 
-void main() => runApp(const BetNaBolaApp());
+void main() async {
+  await DotEnv().load(fileName: '.env');
+
+  ChangeNotifierProvider(
+    create: (_) => SoccerMatches(),
+    child: const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Bet Bola',
+      home: HomeScreen(),
+    ),
+  );
+}
 
 class BetNaBolaApp extends StatelessWidget {
   const BetNaBolaApp({super.key});
@@ -12,7 +26,7 @@ class BetNaBolaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bet na Bola',
+      title: 'Bet Bola',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
