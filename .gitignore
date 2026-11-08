@@ -50,3 +50,4 @@ app.*.map.json
 *.env
 .vscode/
 **/.DS_Store
+gabarito_prova_a.dart
