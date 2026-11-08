@@ -4,6 +4,7 @@ import 'package:betbola/core/widgets/team_shield.dart';
 import 'package:betbola/models/partida.dart';
 import 'package:betbola/models/soccer_matches.dart';
 import 'package:betbola/screens/detail_screen.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -42,15 +43,21 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 2,
           children: const [
             Text('Bet na Bola',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            Text('A rodada começa aqui', style: AppStyles.appBarSubtitle),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
+            Text('A rodada começa aqui',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                )),
           ],
         ),
         leading: Padding(
           padding: const EdgeInsets.all(8),
           child: Container(
+            width: 40,
             decoration: BoxDecoration(
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(8),
@@ -58,14 +65,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Center(
               child: Text('B',
                   style: TextStyle(
-                      color: Colors.black, fontWeight: FontWeight.bold)),
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26)),
             ),
           ),
         ),
       ),
       body: Padding(
-
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -165,12 +173,13 @@ class _GameCard extends StatelessWidget {
                 children: [
                   Text(match.dataRealizacao,
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
+                          color: AppColors.textSecondary, fontSize: 16)),
                   if (isFeatured)
                     const Text('Destaque',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: AppColors.secondary,
-                            fontSize: 12,
+                            color: Color.fromARGB(255, 255, 235, 80),
+                            fontSize: 16,
                             fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -178,27 +187,51 @@ class _GameCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(match.timeMandante.nomePopular,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  TeamShield(
-                      name: match.timeMandante.sigla,
-                      escudo: match.timeMandante.escudo),
+                  // LADO ESQUERDO (Mandante)
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // Flexible evita erro de overflow se o nome do time for muito grande
+                        Flexible(
+                          child: Text(
+                            match.timeMandante.nomePopular,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.right,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TeamShield(escudo: match.timeMandante.escudo),
+                      ],
+                    ),
+                  ),
+
+                  // CENTRO ABSOLUTO (Ícone)
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('X',
-                        style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.bold)),
+                    child: Icon(CupertinoIcons.xmark),
                   ),
-                  TeamShield(
-                      name: match.timeVisitante.sigla,
-                      escudo: match.timeVisitante.escudo),
-                  const SizedBox(width: 8),
-                  Text(match.timeVisitante.nomePopular,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+
+                  // LADO DIREITO (Visitante)
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        TeamShield(escudo: match.timeVisitante.escudo),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            match.timeVisitante.nomePopular,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.left,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

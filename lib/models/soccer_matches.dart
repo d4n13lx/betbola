@@ -34,8 +34,6 @@ class SoccerMatches extends ChangeNotifier {
       final response = await http.get(Uri.parse('${Env.apiUrl}/ao-vivo'),
           headers: {HttpHeaders.authorizationHeader: 'Bearer ${Env.apiToken}'});
 
-      print(response);
-
       if (response.statusCode != 200) {
         throw Exception(response.statusCode);
       }

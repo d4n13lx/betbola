@@ -39,7 +39,6 @@ class _DetailScreenState extends State<DetailScreen> {
             const SizedBox(height: 16),
             _buildBetSelector(),
             const Spacer(),
-            _buildSelectedBetInfo(),
             const SizedBox(height: 16),
             _buildSaveButton(),
           ],
@@ -53,30 +52,44 @@ class _DetailScreenState extends State<DetailScreen> {
       radius: 20,
       child: Column(
         children: [
-          const Text('Hoje • 21:30',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          Text(widget.match.dataRealizacao,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 18)),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _TeamInfo(
+              // LADO ESQUERDO (Mandante)
+              Expanded(
+                child: _TeamInfo(
                   name: widget.match.timeMandante.nomePopular,
                   escudo: widget.match.timeMandante.escudo,
-                  type: 'Mandante'),
+                  type: 'Mandante',
+                ),
+              ),
+
+              // CENTRO ABSOLUTO ("VS")
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text('VS',
-                    style: TextStyle(
-                        color: AppColors.primary, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'VS',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 32),
+                ),
               ),
-              _TeamInfo(
+
+              // LADO DIREITO (Visitante)
+              Expanded(
+                child: _TeamInfo(
                   name: widget.match.timeVisitante.nomePopular,
                   escudo: widget.match.timeVisitante.escudo,
-                  type: 'Visitante'),
+                  type: 'Visitante',
+                ),
+              ),
             ],
           ),
         ],
@@ -95,7 +108,6 @@ class _DetailScreenState extends State<DetailScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                // ✅ era .withOpacity(0.1) — linha 99
                 color: isSelected
                     ? AppColors.primary.withValues(alpha: 0.1)
                     : AppColors.surface,
@@ -119,18 +131,6 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildSelectedBetInfo() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('Seu palpite',
-            style: TextStyle(color: AppColors.textSecondary)),
-        Text('$selectedBet: ${widget.match.timeMandante.nomePopular}',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   Widget _buildSaveButton() {
     return SizedBox(
       width: double.infinity,
@@ -143,11 +143,13 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Palpite salvo! (Na próxima etapa)')),
+            const SnackBar(content: Text('Seu palpite foi salvo!')),
           );
+          
+          Navigator.pop(context);
         },
-        child: const Text('Salvar Palpite',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        child: Text('Apostar em $selectedBet',
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
       ),
     );
   }
@@ -165,12 +167,13 @@ class _TeamInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TeamShield(name: name, escudo: escudo, size: 60),
+        TeamShield(escudo: escudo, size: 90),
         const SizedBox(height: 8),
-        Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(name,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         Text(type,
             style:
-                const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
       ],
     );
   }
