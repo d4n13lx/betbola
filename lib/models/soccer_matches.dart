@@ -1,20 +1,22 @@
-import 'dart:convert';
-import 'package:betbola/models/partida.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import adicionado
+import 'package:flutter/foundation.dart';
+import '../core/services/api_service.dart';
 import '../core/services/user_service.dart';
+import 'partida.dart';
 
+/// Provedor de estado das partidas e apostas do usuário.
 class SoccerMatches extends ChangeNotifier {
-  List<Partida> items = [];
-  Map<int, String> userBets = {};
-  bool carregando = false;
-  String? erro;
+  List<Partida> _items = [];
+  final Map<int, String> _userBets = {};
+  bool _carregando = false;
+  String? _erro;
 
-  // Captura a URL do .env com um fallback de segurança
-  final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
-  int get length => items.length;
-  Partida getMatchById(int id) => items[id];
+  List<Partida> get items => List.unmodifiable(_items);
+  Map<int, String> get userBets => Map.unmodifiable(_userBets);
+  bool get carregando => _carregando;
+  String? get erro => _erro;
+  int get length => _items.length;
+
+  Partida getMatchById(int id) => _items[id];
 
   Future<void> init() async {
     await loadData();
@@ -22,56 +24,43 @@ class SoccerMatches extends ChangeNotifier {
   }
 
   Future<void> loadData() async {
-    carregando = true;
-    erro = null;
+    _carregando = true;
+    _erro = null;
     notifyListeners();
 
     try {
-      // Uso da variável baseUrl
-      final response = await http.get(Uri.parse('$baseUrl/api/matches'));
-
-      if (response.statusCode != 200) {
-        throw Exception('Erro na API: ${response.statusCode}');
-      }
-
-      final map = json.decode(response.body);
-      items = [
-        for (final bruto in map) Partida.fromMap(bruto as Map<String, dynamic>)
-      ];
+      final data = await ApiService.get('/api/matches', userId: '');
+      final list = data as List;
+      _items =
+          list.map((e) => Partida.fromMap(e as Map<String, dynamic>)).toList();
+    } on ApiException catch (e) {
+      _erro = e.message;
     } catch (e) {
-      erro = "Não foi possível carregar as partidas. O backend está rodando?";
-      debugPrint(e.toString());
+      _erro = 'Erro ao carregar partidas.';
+      if (kDebugMode) debugPrint('Erro loadData: $e');
+    } finally {
+      _carregando = false;
+      notifyListeners();
     }
-
-    carregando = false;
-    notifyListeners();
   }
 
   Future<void> fetchBets() async {
     try {
       final userId = await UserService.getUserId();
-      // Uso da variável baseUrl
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/bets'),
-        headers: {'X-User-Id': userId},
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        userBets.clear();
-
-        for (var bet in data) {
-          userBets[bet['partida_id']] = bet['previsao'];
-        }
-        notifyListeners();
+      final data = await ApiService.get('/api/bets', userId: userId);
+      final list = data as List;
+      _userBets.clear();
+      for (var bet in list) {
+        _userBets[bet['partida_id']] = bet['previsao'];
       }
-    } catch (e) {
-      debugPrint('Erro ao buscar apostas: $e');
+      notifyListeners();
+    } on ApiException catch (e) {
+      if (kDebugMode) debugPrint('Erro fetchBets: ${e.message}');
     }
   }
 
   void addBet(int partidaId, String previsao) {
-    userBets[partidaId] = previsao;
+    _userBets[partidaId] = previsao;
     notifyListeners();
   }
 }

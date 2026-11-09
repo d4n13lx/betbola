@@ -21,7 +21,6 @@ class DesafioController {
       }
       final random = Random();
       final pergunta = perguntas[random.nextInt(perguntas.length)];
-      // Retorna sem a resposta correta
       return Response.ok(
         jsonEncode({
           'id': pergunta['id'],
@@ -41,20 +40,38 @@ class DesafioController {
   static Future<Response> responder(Request request) async {
     final userId = request.context['userId'] as String;
     final body = jsonDecode(await request.readAsString());
-    final desafioId = body['desafio_id'];
-    final respostaUsuario = body['resposta'].toString().trim();
+
+    // Validação de entrada
+    final desafioIdRaw = body['desafio_id'];
+    final respostaUsuario = (body['resposta'] as String?)?.trim() ?? '';
+
+    if (desafioIdRaw == null || respostaUsuario.isEmpty) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'desafio_id e resposta são obrigatórios.'}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
+
+    final desafioId = desafioIdRaw is int
+        ? desafioIdRaw
+        : int.tryParse(desafioIdRaw.toString());
+
+    if (desafioId == null) {
+      return Response.badRequest(
+        body: jsonEncode({'error': 'desafio_id inválido.'}),
+        headers: {'content-type': 'application/json'},
+      );
+    }
 
     try {
-      // Busca a pergunta
       final pergunta = await _supabase
           .from('perguntas')
           .select()
           .eq('id', desafioId)
           .single();
       final respostaCorreta = pergunta['resposta_correta'].toString().trim();
-      final tipo = pergunta['tipo'];
+      final tipo = pergunta['tipo'] as String?;
 
-      // Calcula similaridade
       double similaridade;
       if (tipo == 'numero') {
         similaridade = _calcularSimilaridadeNumerica(
@@ -68,7 +85,6 @@ class DesafioController {
         );
       }
 
-      // Busca usuário (ou cria se não existir)
       var user = await _supabase
           .from('usuarios')
           .select()
@@ -98,21 +114,21 @@ class DesafioController {
       if (acertou) {
         pontosGanhos = 10;
         pontosAtuais += pontosGanhos;
-        errosConsecutivos = 0; // reset
+        errosConsecutivos = 0;
         mensagem = 'Parabéns! Você acertou e ganhou $pontosGanhos pontos.';
       } else {
         pontosGanhos = -10;
-        pontosAtuais -= 10; // perde 10
+        pontosAtuais -= 10;
         errosConsecutivos++;
         if (errosConsecutivos >= 3) {
           bloqueadoAte = DateTime.now().add(const Duration(minutes: 5));
-          mensagem = 'Você errou 3 vezes seguidas. Fique bloqueado por 5 minutos para refletir.';
+          mensagem =
+              'Você errou 3 vezes seguidas. Fique bloqueado por 5 minutos.';
         } else {
           mensagem = 'Você errou! Perdeu 10 pontos. Tente novamente.';
         }
       }
 
-      // Atualiza usuário
       await _supabase
           .from('usuarios')
           .update({
@@ -140,22 +156,22 @@ class DesafioController {
   }
 
   static double _calcularSimilaridadeNumerica(String usuario, String correta) {
-    final num1 = double.tryParse(usuario) ?? 0;
-    final num2 = double.tryParse(correta) ?? 1;
+    final num1 = double.tryParse(usuario);
+    final num2 = double.tryParse(correta);
+    if (num1 == null || num2 == null) return 0.0;
     if (num2 == 0) return num1 == 0 ? 1.0 : 0.0;
-    return 1.0 - (num1 - num2).abs() / num2;
+    final diff = (num1 - num2).abs() / num2.abs();
+    return (1.0 - diff).clamp(0.0, 1.0);
   }
 
   static double _calcularSimilaridadeTexto(String usuario, String correta) {
-    // Implementação simples de Jaro-Winkler (ou use pacote fuzzy_bolt)
-    // Para simplificar, compare minúsculas e distância de Levenshtein normalizada
     final a = usuario.toLowerCase();
     final b = correta.toLowerCase();
     if (a == b) return 1.0;
     final dist = _levenshtein(a, b);
     final maxLen = max(a.length, b.length);
     if (maxLen == 0) return 1.0;
-    return 1.0 - dist / maxLen;
+    return (1.0 - dist / maxLen).clamp(0.0, 1.0);
   }
 
   static int _levenshtein(String a, String b) {

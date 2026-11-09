@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import '../core/services/api_service.dart';
 import '../core/services/user_service.dart';
 import '../core/theme/app_colors.dart';
 import '../models/user_provider.dart';
 import 'results_screen.dart';
 
+/// Tela de perfil com estatísticas e pontos.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -17,9 +16,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
-  int _acertos = 0;
-  int _erros = 0;
-  int _pendentes = 0;
+  int _acertos = 0, _erros = 0, _pendentes = 0;
   String? _erro;
   bool _conferindo = false;
 
@@ -36,35 +33,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
     try {
       final userId = await UserService.getUserId();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/bets'),
-        headers: {'X-User-Id': userId},
-      );
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        int acertos = 0, erros = 0, pendentes = 0;
-        for (var bet in data) {
-          if (bet['status'] == 'acertou') {
-            acertos++;
-          } else if (bet['status'] == 'errou') {
-            erros++;
-          } else {
-            pendentes++;
-          }
+      final data = await ApiService.get('/api/bets', userId: userId);
+      final list = data as List;
+      int acertos = 0, erros = 0, pendentes = 0;
+      for (var bet in list) {
+        if (bet['status'] == 'acertou') {
+          acertos++;
+        } else if (bet['status'] == 'errou') {
+          erros++;
+        } else {
+          pendentes++;
         }
-        setState(() {
-          _acertos = acertos;
-          _erros = erros;
-          _pendentes = pendentes;
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Erro ${response.statusCode}');
       }
-    } catch (e) {
       setState(() {
-        _erro = e.toString();
+        _acertos = acertos;
+        _erros = erros;
+        _pendentes = pendentes;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _erro = e.message;
         _isLoading = false;
       });
     }
@@ -74,32 +63,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _conferindo = true);
     try {
       final userId = await UserService.getUserId();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/bets/check-results'),
-        headers: {'X-User-Id': userId},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final ganhos = data['pontos_ganhos'] ?? 0;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Conferência concluída! +$ganhos pontos.')),
-          );
-          context.read<UserProvider>().fetchUserStatus();
-          await _fetchBets();
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ResultsScreen()),
-            );
-          }
-        }
-      }
-    } catch (e) {
+      final data =
+          await ApiService.post('/api/bets/check-results', userId: userId);
+      final ganhos = data['pontos_ganhos'] ?? 0;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
+          SnackBar(content: Text('Conferência concluída! +$ganhos pontos.')),
+        );
+        context.read<UserProvider>().fetchUserStatus();
+        await _fetchBets();
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ResultsScreen()),
+          );
+        }
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.message}')),
         );
       }
     } finally {
@@ -131,13 +114,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const Icon(Icons.stars, color: AppColors.primary, size: 18),
                     const SizedBox(width: 4),
-                    Text(
-                      '${user.pontos} pts',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text('${user.pontos} pts',
+                        style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -160,7 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Card de Pontos
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(24),
@@ -187,14 +166,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     fontSize: 12,
                                     letterSpacing: 1.2,
                                   )),
-                              Text(
-                                '${user.pontos}',
-                                style: const TextStyle(
-                                  fontSize: 56,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
+                              Text('${user.pontos}',
+                                  style: const TextStyle(
+                                    fontSize: 56,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  )),
                               if (user.estaBloqueado)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -205,35 +182,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
-                                    '⚠️ Bloqueado temporariamente',
-                                    style: TextStyle(color: AppColors.danger),
-                                  ),
+                                      '⚠️ Bloqueado temporariamente',
+                                      style:
+                                          TextStyle(color: AppColors.danger)),
                                 ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 24),
-                        // Stats
                         Row(
                           children: [
                             Expanded(
-                              child: _buildStatCard(
-                                  'Acertos', '$_acertos', AppColors.primary),
-                            ),
+                                child: _buildStatCard(
+                                    'Acertos', '$_acertos', AppColors.primary)),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _buildStatCard(
-                                  'Erros', '$_erros', AppColors.danger),
-                            ),
+                                child: _buildStatCard(
+                                    'Erros', '$_erros', AppColors.danger)),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _buildStatCard(
-                                  'Pendentes', '$_pendentes', Colors.amber),
-                            ),
+                                child: _buildStatCard(
+                                    'Pendentes', '$_pendentes', Colors.amber)),
                           ],
                         ),
                         const SizedBox(height: 24),
-                        // Botões
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -253,16 +225,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ? 'Conferindo...'
                                   : 'Conferir Resultados',
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.secondary,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ),
@@ -271,28 +241,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           width: double.infinity,
                           height: 54,
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const ResultsScreen()),
-                              );
-                            },
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ResultsScreen()),
+                            ),
                             icon: const Icon(Icons.history,
                                 color: AppColors.primary),
-                            label: const Text(
-                              'Ver Histórico Completo',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                            label: const Text('Ver Histórico Completo',
+                                style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: AppColors.primary),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ),

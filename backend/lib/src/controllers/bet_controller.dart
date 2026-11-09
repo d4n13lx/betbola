@@ -31,13 +31,13 @@ class BetController {
     }
   }
 
-  // --- CREATE (Criar) ---
+  // --- CREATE (Criar) com transação atômica ---
   static Future<Response> create(Request request) async {
     final userId = request.context['userId'] as String;
     final body = jsonDecode(await request.readAsString());
 
     try {
-      // 1. Buscar usuário e verificar pontos/bloqueio
+      // 1. Buscar usuário e verificar bloqueio
       var user = await _supabase
           .from('usuarios')
           .select()
@@ -57,28 +57,16 @@ class BetController {
             .single();
       }
 
-      final pontos = user['pontos'] as int;
       final bloqueadoAte = user['bloqueado_ate'] as String?;
-
       if (bloqueadoAte != null &&
           DateTime.parse(bloqueadoAte).isAfter(DateTime.now())) {
         return Response.forbidden(
-          jsonEncode({
-            'error': 'Você está bloqueado. Aguarde para apostar novamente.',
-          }),
+          jsonEncode({'error': 'Você está bloqueado. Aguarde.'}),
           headers: {'content-type': 'application/json'},
         );
       }
-      if (pontos < 5) {
-        return Response.badRequest(
-          body: jsonEncode({
-            'error':
-                'Pontos insuficientes. Participe de desafios para ganhar mais.',
-          }),
-          headers: {'content-type': 'application/json'},
-        );
-      }
-      // 2. Verifica se a partida já começou
+
+      // 2. Verifica status da partida
       final match = await FootballApiService.getMatchById(
         body['partida_id'] as int,
       );
@@ -90,37 +78,38 @@ class BetController {
           headers: {'content-type': 'application/json'},
         );
       }
-      // 3. Debita 5 pontos do usuário
-      await _supabase
-          .from('usuarios')
-          .update({'pontos': pontos - 5})
-          .eq('user_id', userId);
 
-      // 4. Insere a previsão
-      final response = await _supabase
-          .from('previsoes')
-          .insert({
-            'user_id': userId,
-            'partida_id': body['partida_id'],
-            'time_casa': match['time_mandante']['nome_popular'],
-            'time_fora': match['time_visitante']['nome_popular'],
-            'escudo_casa': match['time_mandante']['escudo'],
-            'escudo_fora': match['time_visitante']['escudo'],
-            'rodada': match['campeonato']['rodada'] ?? 0,
-            'previsao': body['previsao'],
-            'status': 'pendente',
-            'pontos': 0,
-          })
-          .select()
-          .single();
+      // 3. Chama a função SQL atômica
+      final result = await _supabase.rpc(
+        'criar_previsao_atomica',
+        params: {
+          'p_user_id': userId,
+          'p_partida_id': body['partida_id'],
+          'p_time_casa': match['time_mandante']['nome_popular'],
+          'p_time_fora': match['time_visitante']['nome_popular'],
+          'p_escudo_casa': match['time_mandante']['escudo'],
+          'p_escudo_fora': match['time_visitante']['escudo'],
+          'p_rodada': match['campeonato']['rodada'] ?? 0,
+          'p_previsao': body['previsao'],
+        },
+      );
 
       return Response.ok(
-        jsonEncode(response),
+        jsonEncode(result),
         headers: {'content-type': 'application/json'},
       );
     } catch (e) {
-      // Captura erro de chave única (previsão duplicada)
-      if (e.toString().contains('23505')) {
+      final msg = e.toString();
+      if (msg.contains('PONTOS_INSUFICIENTES')) {
+        return Response.badRequest(
+          body: jsonEncode({
+            'error':
+                'Pontos insuficientes. Participe de desafios para ganhar mais.',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (msg.contains('23505')) {
         return Response.badRequest(
           body: jsonEncode({
             'error': 'Você já fez uma previsão para esta partida.',
@@ -128,9 +117,7 @@ class BetController {
           headers: {'content-type': 'application/json'},
         );
       }
-      return Response.internalServerError(
-        body: jsonEncode({'error': e.toString()}),
-      );
+      return Response.internalServerError(body: jsonEncode({'error': msg}));
     }
   }
 
@@ -234,14 +221,11 @@ class BetController {
               })
               .eq('id', bet['id']);
 
-          if (pontos > 0) {
-            pontosGanhosTotal += pontos;
-          }
+          if (pontos > 0) pontosGanhosTotal += pontos;
           conferidas++;
         }
       }
 
-      // Credita pontos ganhos ao usuário
       if (pontosGanhosTotal > 0) {
         final user = await _supabase
             .from('usuarios')
@@ -264,7 +248,6 @@ class BetController {
         headers: {'content-type': 'application/json'},
       );
     } catch (e) {
-      print('❌ ERRO NO CHECK RESULTS: $e');
       return Response.internalServerError(
         body: jsonEncode({'error': e.toString()}),
       );

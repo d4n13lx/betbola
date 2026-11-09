@@ -14,7 +14,9 @@ class FootballApiService {
     final url = Uri.parse('${Env.footballApiUrl}/ao-vivo');
     print('🔍 BUSCANDO: $url');
 
-    final response = await http.get(url, headers: _headers);
+    final response = await http
+        .get(url, headers: _headers)
+        .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
       print('❌ ERRO API: ${response.statusCode} - ${response.body}');

@@ -17,7 +17,7 @@ class Partida {
   final Estadio estadio;
   final String link;
 
-  Partida({
+  const Partida({
     required this.id,
     required this.campeonato,
     required this.placar,
@@ -43,14 +43,16 @@ class Partida {
         id: (json["partida_id"] as int?) ?? 0,
         campeonato: json["campeonato"] != null
             ? Campeonato.fromMap(json["campeonato"] as Map<String, dynamic>)
-            : Campeonato(campeonatoId: 0, nome: 'Desconhecido', slug: ''),
+            : const Campeonato(campeonatoId: 0, nome: 'Desconhecido', slug: ''),
         placar: (json["placar"] as String?) ?? '',
         timeMandante: json["time_mandante"] != null
             ? TimeAnte.fromMap(json["time_mandante"] as Map<String, dynamic>)
-            : TimeAnte(timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
+            : const TimeAnte(
+                timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
         timeVisitante: json["time_visitante"] != null
             ? TimeAnte.fromMap(json["time_visitante"] as Map<String, dynamic>)
-            : TimeAnte(timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
+            : const TimeAnte(
+                timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
         placarMandante: (json["placar_mandante"] as int?) ?? 0,
         placarVisitante: (json["placar_visitante"] as int?) ?? 0,
         disputaPenalti: (json["disputa_penalti"] as bool?) ?? false,
@@ -61,9 +63,10 @@ class Partida {
         dataRealizacaoIso: (json["data_realizacao_iso"] as String?) ?? '',
         estadio: json["estadio"] != null
             ? Estadio.fromMap(json["estadio"] as Map<String, dynamic>)
-            : Estadio(estadioId: 0, nomePopular: ''),
+            : const Estadio(estadioId: 0, nomePopular: ''),
         link: (json["_link"] as String?) ?? '',
       );
+
   Map<String, dynamic> toMap() => {
         "partida_id": id,
         "campeonato": campeonato.toMap(),
@@ -88,21 +91,16 @@ class Campeonato {
   final String nome;
   final String slug;
 
-  Campeonato({
+  const Campeonato({
     required this.campeonatoId,
     required this.nome,
     required this.slug,
   });
 
-  factory Campeonato.fromJson(String str) =>
-      Campeonato.fromMap(json.decode(str));
-
-  String toJson() => json.encode(toMap());
-
   factory Campeonato.fromMap(Map<String, dynamic> json) => Campeonato(
-        campeonatoId: json["campeonato_id"],
-        nome: json["nome"],
-        slug: json["slug"],
+        campeonatoId: (json["campeonato_id"] as int?) ?? 0,
+        nome: (json["nome"] as String?) ?? '',
+        slug: (json["slug"] as String?) ?? '',
       );
 
   Map<String, dynamic> toMap() => {
@@ -116,18 +114,11 @@ class Estadio {
   final int estadioId;
   final String nomePopular;
 
-  Estadio({
-    required this.estadioId,
-    required this.nomePopular,
-  });
-
-  factory Estadio.fromJson(String str) => Estadio.fromMap(json.decode(str));
-
-  String toJson() => json.encode(toMap());
+  const Estadio({required this.estadioId, required this.nomePopular});
 
   factory Estadio.fromMap(Map<String, dynamic> json) => Estadio(
-        estadioId: json["estadio_id"],
-        nomePopular: json["nome_popular"],
+        estadioId: (json["estadio_id"] as int?) ?? 0,
+        nomePopular: (json["nome_popular"] as String?) ?? '',
       );
 
   Map<String, dynamic> toMap() => {
@@ -142,22 +133,18 @@ class TimeAnte {
   final String sigla;
   final String escudo;
 
-  TimeAnte({
+  const TimeAnte({
     required this.timeId,
     required this.nomePopular,
     required this.sigla,
     required this.escudo,
   });
 
-  factory TimeAnte.fromJson(String str) => TimeAnte.fromMap(json.decode(str));
-
-  String toJson() => json.encode(toMap());
-
   factory TimeAnte.fromMap(Map<String, dynamic> json) => TimeAnte(
-        timeId: json["time_id"],
-        nomePopular: json["nome_popular"],
-        sigla: json["sigla"],
-        escudo: json["escudo"],
+        timeId: (json["time_id"] as int?) ?? 0,
+        nomePopular: (json["nome_popular"] as String?) ?? '',
+        sigla: (json["sigla"] as String?) ?? '',
+        escudo: (json["escudo"] as String?) ?? '',
       );
 
   Map<String, dynamic> toMap() => {

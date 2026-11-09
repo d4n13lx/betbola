@@ -1,6 +1,5 @@
 import 'package:betbola/models/soccer_matches.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'models/user_provider.dart';
 import 'core/theme/app_colors.dart';
@@ -10,7 +9,7 @@ import 'screens/profile_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+  // await dotenv.load(fileName: '.env');
 
   runApp(
     MultiProvider(

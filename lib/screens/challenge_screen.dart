@@ -1,14 +1,13 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_styles.dart';
-import '../../core/services/user_service.dart';
-import '../../models/desafio.dart';
 import 'package:provider/provider.dart';
-import '../../models/user_provider.dart';
+import '../core/services/api_service.dart';
+import '../core/services/user_service.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_styles.dart';
+import '../models/desafio.dart';
+import '../models/user_provider.dart';
 
+/// Tela de desafios anti-vício.
 class ChallengeScreen extends StatefulWidget {
   const ChallengeScreen({super.key});
 
@@ -48,69 +47,52 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
     });
     try {
       final userId = await UserService.getUserId();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/desafios/aleatorio'),
-        headers: {'X-User-Id': userId},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _desafio = Desafio.fromMap(data);
-        });
-      } else {
-        setState(() => _erro = 'Erro ao carregar desafio.');
-      }
-    } catch (e) {
-      setState(() => _erro = 'Falha de conexão: $e');
+      final data =
+          await ApiService.get('/api/desafios/aleatorio', userId: userId);
+      setState(() => _desafio = Desafio.fromMap(data));
+    } on ApiException catch (e) {
+      setState(() => _erro = e.message);
+    } catch (_) {
+      setState(() => _erro = 'Erro ao carregar desafio.');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _responder() async {
+    if (_isSubmitting) return; // Guard contra double-tap
     if (!_formKey.currentState!.validate() || _desafio == null) return;
+
     setState(() => _isSubmitting = true);
 
-    final userId = await UserService.getUserId();
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
-
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/desafios/responder'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': userId,
-        },
-        body: jsonEncode({
+      final userId = await UserService.getUserId();
+      final data = await ApiService.post(
+        '/api/desafios/responder',
+        userId: userId,
+        body: {
           'desafio_id': _desafio!.id,
           'resposta': _respostaController.text.trim(),
-        }),
+        },
       );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200) {
-        setState(() {
-          _acertou = data['acertou'];
-          _mensagemResultado = data['mensagem'];
-        });
-        // Limpa o campo e opcionalmente carrega novo desafio
-        _respostaController.clear();
-
-        if (mounted) {
-          context.read<UserProvider>().fetchUserStatus();
-        }
-      } else {
-        setState(() => _erro = data['error'] ?? 'Erro ao responder.');
-      }
-    } catch (e) {
-      setState(() => _erro = 'Falha de conexão: $e');
+      setState(() {
+        _acertou = data['acertou'];
+        _mensagemResultado = data['mensagem'];
+      });
+      _respostaController.clear();
+      if (mounted) context.read<UserProvider>().fetchUserStatus();
+    } on ApiException catch (e) {
+      setState(() => _erro = e.message);
+    } catch (_) {
+      setState(() => _erro = 'Falha de conexão.');
     } finally {
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final pontos = context.select<UserProvider, int>((p) => p.pontos);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.background,
@@ -122,7 +104,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
           ],
         ),
         actions: [
-          // Chip de pontos
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Center(
@@ -140,7 +121,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                     const Icon(Icons.stars, color: AppColors.primary, size: 18),
                     const SizedBox(width: 4),
                     Text(
-                      '${context.watch<UserProvider>().pontos} pts',
+                      '$pontos pts',
                       style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
@@ -152,17 +133,29 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
               ),
             ),
           ),
-          // Botão de recarregar
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _carregarDesafio,
-          ),
+              icon: const Icon(Icons.refresh), onPressed: _carregarDesafio),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _erro != null
-              ? Center(child: Text(_erro!))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_erro!),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _carregarDesafio,
+                          child: const Text('Tentar Novamente'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Form(
@@ -170,7 +163,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Pergunta
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(24),
@@ -194,7 +186,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        // Campo de resposta
                         TextFormField(
                           controller: _respostaController,
                           decoration: InputDecoration(
@@ -207,13 +198,11 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                                   const BorderSide(color: AppColors.border),
                             ),
                           ),
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                                  ? 'Campo obrigatório'
-                                  : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Campo obrigatório'
+                              : null,
                         ),
                         const SizedBox(height: 24),
-                        // Botão
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -234,7 +223,6 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                                         fontWeight: FontWeight.bold)),
                           ),
                         ),
-                        // Feedback
                         if (_mensagemResultado != null) ...[
                           const SizedBox(height: 24),
                           Container(
