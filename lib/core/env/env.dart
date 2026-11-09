@@ -1,4 +1,5 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
+import 'package:dotenv/dotenv.dart';
 
 class Env {
   // Opcional: Você pode chamar Env.load() no seu main.dart

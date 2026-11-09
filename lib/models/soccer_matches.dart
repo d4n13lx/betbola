@@ -1,7 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:betbola/core/env/env.dart';
 import 'package:betbola/models/partida.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -43,7 +40,8 @@ class SoccerMatches extends ChangeNotifier {
         for (final bruto in map) Partida.fromMap(bruto as Map<String, dynamic>)
       ];
     } catch (e) {
-      erro = "Não foi possível carregar os dados da API e não há dados salvos.";
+      erro = "Não foi possível carregar as partidas. O backend está rodando?";
+      print(e);
     }
 
     carregando = false;
