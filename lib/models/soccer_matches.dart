@@ -1,20 +1,20 @@
-// lib/models/bet_history.dart
 import 'dart:convert';
 import 'package:betbola/models/partida.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import adicionado
+import 'package:shared_preferences/shared_preferences.dart';
+import '../core/services/user_service.dart';
 
-/// Lista das partidas em andamento ao vivo.
 class SoccerMatches extends ChangeNotifier {
   List<Partida> items = [];
-
-  final Set<Map<int, String>> bets = {};
-
+  Map<int, String> userBets = {};
   bool carregando = false;
   String? erro;
 
+  // Captura a URL do .env com um fallback de segurança
+  final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
   int get length => items.length;
-
   Partida getMatchById(int id) => items[id];
 
   Future<void> init() async {
@@ -28,15 +28,14 @@ class SoccerMatches extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:8080/api/matches'),
-      );
+      // Uso da variável baseUrl
+      final response = await http.get(Uri.parse('$baseUrl/api/matches'));
 
       if (response.statusCode != 200) {
-        throw Exception('Erro no servidor: ${response.statusCode}');
+        throw Exception('Erro na API: ${response.statusCode}');
       }
 
-      final List<dynamic> map = json.decode(response.body);
+      final map = json.decode(response.body);
       items = [
         for (final bruto in map) Partida.fromMap(bruto as Map<String, dynamic>)
       ];
@@ -49,5 +48,31 @@ class SoccerMatches extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchBets() async {}
+  Future<void> fetchBets() async {
+    try {
+      final userId = await UserService.getUserId();
+      // Uso da variável baseUrl
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/bets'),
+        headers: {'X-User-Id': userId},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        userBets.clear();
+
+        for (var bet in data) {
+          userBets[bet['partida_id']] = bet['previsao'];
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Erro ao buscar apostas: $e');
+    }
+  }
+
+  void addBet(int partidaId, String previsao) {
+    userBets[partidaId] = previsao;
+    notifyListeners();
+  }
 }

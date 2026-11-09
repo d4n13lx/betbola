@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 class Partida {
-  final int partidaId;
+  final int id;
   final Campeonato campeonato;
   final String placar;
   final TimeAnte timeMandante;
@@ -18,7 +18,7 @@ class Partida {
   final String link;
 
   Partida({
-    required this.partidaId,
+    required this.id,
     required this.campeonato,
     required this.placar,
     required this.timeMandante,
@@ -40,7 +40,7 @@ class Partida {
   String toJson() => json.encode(toMap());
 
   factory Partida.fromMap(Map<String, dynamic> json) => Partida(
-        partidaId: json["partida_id"],
+        id: json["partida_id"],
         campeonato: Campeonato.fromMap(json["campeonato"]),
         placar: json["placar"],
         timeMandante: TimeAnte.fromMap(json["time_mandante"]),
@@ -58,7 +58,7 @@ class Partida {
       );
 
   Map<String, dynamic> toMap() => {
-        "partida_id": partidaId,
+        "partida_id": id,
         "campeonato": campeonato.toMap(),
         "placar": placar,
         "time_mandante": timeMandante.toMap(),
