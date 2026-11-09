@@ -40,23 +40,30 @@ class Partida {
   String toJson() => json.encode(toMap());
 
   factory Partida.fromMap(Map<String, dynamic> json) => Partida(
-        id: json["partida_id"],
-        campeonato: Campeonato.fromMap(json["campeonato"]),
-        placar: json["placar"],
-        timeMandante: TimeAnte.fromMap(json["time_mandante"]),
-        timeVisitante: TimeAnte.fromMap(json["time_visitante"]),
-        placarMandante: json["placar_mandante"],
-        placarVisitante: json["placar_visitante"],
-        disputaPenalti: json["disputa_penalti"],
-        status: json["status"],
-        slug: json["slug"],
-        dataRealizacao: json["data_realizacao"],
-        horaRealizacao: json["hora_realizacao"],
-        dataRealizacaoIso: json["data_realizacao_iso"],
-        estadio: Estadio.fromMap(json["estadio"]),
-        link: json["_link"],
+        id: (json["partida_id"] as int?) ?? 0,
+        campeonato: json["campeonato"] != null
+            ? Campeonato.fromMap(json["campeonato"] as Map<String, dynamic>)
+            : Campeonato(campeonatoId: 0, nome: 'Desconhecido', slug: ''),
+        placar: (json["placar"] as String?) ?? '',
+        timeMandante: json["time_mandante"] != null
+            ? TimeAnte.fromMap(json["time_mandante"] as Map<String, dynamic>)
+            : TimeAnte(timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
+        timeVisitante: json["time_visitante"] != null
+            ? TimeAnte.fromMap(json["time_visitante"] as Map<String, dynamic>)
+            : TimeAnte(timeId: 0, nomePopular: 'Time', sigla: '?', escudo: ''),
+        placarMandante: (json["placar_mandante"] as int?) ?? 0,
+        placarVisitante: (json["placar_visitante"] as int?) ?? 0,
+        disputaPenalti: (json["disputa_penalti"] as bool?) ?? false,
+        status: (json["status"] as String?) ?? 'Agendada',
+        slug: (json["slug"] as String?) ?? '',
+        dataRealizacao: (json["data_realizacao"] as String?) ?? '',
+        horaRealizacao: (json["hora_realizacao"] as String?) ?? '',
+        dataRealizacaoIso: (json["data_realizacao_iso"] as String?) ?? '',
+        estadio: json["estadio"] != null
+            ? Estadio.fromMap(json["estadio"] as Map<String, dynamic>)
+            : Estadio(estadioId: 0, nomePopular: ''),
+        link: (json["_link"] as String?) ?? '',
       );
-
   Map<String, dynamic> toMap() => {
         "partida_id": id,
         "campeonato": campeonato.toMap(),

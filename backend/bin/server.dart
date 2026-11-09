@@ -4,6 +4,7 @@ import 'package:backend/src/routes/app_router.dart';
 import 'package:backend/src/middlewares/error_middleware.dart';
 import 'package:backend/src/middlewares/auth_middleware.dart';
 import 'package:backend/src/config/env.dart';
+import 'package:backend/src/middlewares/rate_limit_middleware.dart';
 
 void main() async {
   Env.load();
@@ -13,6 +14,7 @@ void main() async {
   final handler = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(errorMiddleware())
+      .addMiddleware(RateLimitMiddleware(maxRequests: 30).call())
       .addMiddleware(authMiddleware())
       .addHandler(router.call);
 

@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/user_service.dart';
 import '../../core/widgets/app_card.dart';
 
@@ -19,7 +18,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
   List<dynamic> _bets = [];
   String? _erro;
 
-  // Estatísticas
   int _totalPontos = 0;
   int _acertos = 0;
   int _erros = 0;
@@ -36,72 +34,52 @@ class _ResultsScreenState extends State<ResultsScreen> {
       _erro = null;
     });
 
-    final userId = await UserService.getUserId();
-
     try {
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:8080/api/bets'),
-        headers: {'X-User-Id': userId},
-      );
+      final userId = await UserService.getUserId();
+      final data = await ApiService.get('/api/bets', userId: userId);
+      final List<dynamic> list = data as List;
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-
-        int pontos = 0;
-        int acertos = 0;
-        int erros = 0;
-
-        for (var bet in data) {
-          if (bet['status'] == 'acertou') {
-            acertos++;
-            pontos += (bet['pontos'] as int? ?? 0);
-          } else if (bet['status'] == 'errou') {
-            erros++;
-          }
+      int pontos = 0, acertos = 0, erros = 0;
+      for (var bet in list) {
+        if (bet['status'] == 'acertou') {
+          acertos++;
+          pontos += (bet['pontos'] as int?) ?? 0;
+        } else if (bet['status'] == 'errou') {
+          erros++;
         }
-
-        if (mounted) {
-          setState(() {
-            _bets = data;
-            _totalPontos = pontos;
-            _acertos = acertos;
-            _erros = erros;
-          });
-        }
-      } else {
-        throw Exception('Erro ao carregar dados do servidor.');
       }
+
+      if (mounted) {
+        setState(() {
+          _bets = list;
+          _totalPontos = pontos;
+          _acertos = acertos;
+          _erros = erros;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _erro = e.message);
     } catch (e) {
-      if (mounted) {
-        setState(() => _erro = e.toString());
-      }
+      if (mounted) setState(() => _erro = 'Erro ao carregar dados.');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _deletarAposta(dynamic id) async {
-    final userId = await UserService.getUserId();
     try {
-      final response = await http.delete(
-        Uri.parse('http://10.0.2.2:8080/api/bets/$id'),
-        headers: {'X-User-Id': userId},
-      );
-
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Aposta excluída!')),
-          );
-        }
-        _fetchBets(); // Recarrega a lista
-      }
-    } catch (e) {
+      final userId = await UserService.getUserId();
+      await ApiService.delete('/api/bets/$id', userId: userId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao excluir aposta.')),
+          const SnackBar(content: Text('Aposta excluída!')),
+        );
+      }
+      _fetchBets();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.message}')),
         );
       }
     }
@@ -135,7 +113,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Card de Estatísticas Principal
                       AppCard(
                         radius: 20,
                         child: Column(
@@ -181,7 +158,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-
                       const Text('HISTÓRICO DE PALPITES',
                           style: AppStyles.tagStyle),
                       const SizedBox(height: 8),
@@ -189,16 +165,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
                           style: const TextStyle(
                               fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 16),
-
                       Expanded(
                         child: _bets.isEmpty
                             ? _buildEmptyState()
                             : ListView.builder(
                                 itemCount: _bets.length,
-                                itemBuilder: (context, index) {
-                                  final bet = _bets[index];
-                                  return _buildBetCard(bet);
-                                },
+                                itemBuilder: (context, index) =>
+                                    _buildBetCard(_bets[index]),
                               ),
                       ),
                     ],
@@ -207,7 +180,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  // Mini-cards (chips) dentro do Card de Estatísticas
   Widget _buildStatBadge(String label, String value, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -228,7 +200,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  // Estado Vazio (Nenhuma aposta)
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -244,7 +215,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  // Card individual do Histórico de Apostas
   Widget _buildBetCard(dynamic bet) {
     final isPendente = bet['status'] == 'pendente';
     final isAcertou = bet['status'] == 'acertou';
@@ -263,10 +233,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppStyles.cardDecoration(
-        color: AppColors.surfaceLight,
-        radius: 16,
-      ),
+      decoration:
+          AppStyles.cardDecoration(color: AppColors.surfaceLight, radius: 16),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         leading: Container(
@@ -278,10 +246,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ),
           child: Icon(statusIcon, color: statusColor, size: 28),
         ),
-        title: Text(
-          '${bet['time_casa']} x ${bet['time_fora']}',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        title: Text('${bet['time_casa']} x ${bet['time_fora']}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(

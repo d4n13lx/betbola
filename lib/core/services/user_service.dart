@@ -1,15 +1,10 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import 'secure_storage_service.dart';
 
+/// Fachada de compatibilidade. Mantém a API antiga, mas usa
+/// armazenamento criptografado por baixo.
 class UserService {
-  static Future<String> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString('user_id');
+  UserService._();
 
-    if (userId == null) {
-      userId = const Uuid().v4();
-      await prefs.setString('user_id', userId);
-    }
-    return userId;
-  }
+  /// Retorna o ID único do usuário, persistido de forma segura.
+  static Future<String> getUserId() => SecureStorageService.getUserId();
 }

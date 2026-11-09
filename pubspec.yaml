@@ -45,6 +45,7 @@ dependencies:
   supabase: ^2.6.0 # Cliente oficial do Supabase para Dart
   uuid: ^4.6.0 # Para validar UUIDs
   dotenv: ^4.2.0
+  flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
   flutter_test:
