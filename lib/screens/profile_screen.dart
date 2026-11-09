@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_styles.dart';
-import '../../core/widgets/app_card.dart';
-import '../../core/services/user_service.dart';
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 1. Adicionado o import do dotenv
+import '../core/services/user_service.dart';
 
-/// Tela de Perfil — Vinicius
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -14,137 +12,121 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isLoading = false;
+  List<dynamic> userBets = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkResults();
+  }
+
+  Future<void> _checkResults() async {
+    try {
+      final userId = await UserService.getUserId();
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/bets/check-results'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': userId,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decodedBody = json.decode(response.body);
+
+        setState(() {
+          if (decodedBody is List) {
+            userBets = decodedBody;
+          }
+          else if (decodedBody is Map<String, dynamic>) {
+            if (decodedBody.containsKey('data')) {
+              userBets = decodedBody['data'] as List;
+            } else if (decodedBody.containsKey('bets')) {
+              userBets = decodedBody['bets'] as List;
+            } else if (decodedBody.containsKey('resultados')) {
+              userBets = decodedBody['resultados'] as List;
+            } else if (decodedBody.containsKey('message')) {
+              // Captura a mensagem do backend e limpa a lista
+              userBets = [];
+              // Define a mensagem para aparecer na tela de forma amigável
+              errorMessage = decodedBody['message'];
+            } else {
+              errorMessage = 'Formato de resposta inesperado: $decodedBody';
+            }
+          }
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          errorMessage = 'Erro ao carregar resultados: ${response.statusCode}';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Erro de conexão: $e';
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text('Meu Perfil', style: TextStyle(fontSize: 18)),
-            Text('Seu desempenho', style: AppStyles.appBarSubtitle),
-          ],
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.borderLight),
-                borderRadius: BorderRadius.circular(20),
-                color: AppColors.surface,
-              ),
-              child: Column(
-                children: const [
-                  Icon(Icons.bar_chart, color: AppColors.primary, size: 32),
-                  SizedBox(height: 8),
-                  Text('Pontuação Total',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
-                  Text('1.280',
-                      style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
-                  Text('+120 pontos nesta rodada',
-                      style: TextStyle(color: AppColors.primary, fontSize: 12)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                      'Acertos', '18', '72% dos palpites', AppColors.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                      'Erros', '7', '28% dos palpites', AppColors.danger),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _isLoading ? null : _conferirResultados,
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Conferir Resultados',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('Meu Perfil e Apostas')),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+              ? Center(child: Text(errorMessage!))
+              : userBets.isEmpty
+                  ? const Center(
+                      child: Text('Você ainda não tem apostas registradas.'))
+                  : ListView.builder(
+                      itemCount: userBets.length,
+                      itemBuilder: (context, index) {
+                        final bet = userBets[index];
+                        return ListTile(
+                          title: Text('Partida: ${bet['partida_id']}'),
+                          subtitle: Text('Palpite: ${bet['previsao']}'),
+                          trailing: _buildStatusBadge(bet['status']),
+                        );
+                      },
+                    ),
     );
   }
 
-  Future<void> _conferirResultados() async {
-    setState(() => _isLoading = true);
-    final userId = await UserService.getUserId();
+  Widget _buildStatusBadge(String? status) {
+    Color color;
+    String text;
 
-    try {
-      final response = await http.post(
-        Uri.parse('http://10.0.2.2:8080/api/bets/check-results'),
-        headers: {'X-User-Id': userId},
-      );
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Resultados conferidos! Vá para a tela de histórico.')),
-          );
-        }
-      } else {
-        // ADICIONE ESTE PRINT AQUI
-        print('ERRO DO SERVIDOR: ${response.statusCode} - ${response.body}');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao conferir resultados.')),
-          );
-        }
-      }
-    } catch (e) {
-      print('ERRO DE CONEXÃO FLUTTER: $e');
-      // ...
+    switch (status) {
+      case 'ganhou':
+        color = Colors.green;
+        text = 'Ganhou';
+        break;
+      case 'perdeu':
+        color = Colors.red;
+        text = 'Perdeu';
+        break;
+      default:
+        color = Colors.grey;
+        text = 'Pendente';
     }
-  }
 
-  Widget _buildStatCard(String label, String value, String sub, Color color) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12)),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-          Text(sub,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 10)),
-        ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
       ),
     );
   }

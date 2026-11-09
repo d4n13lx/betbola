@@ -12,6 +12,34 @@ class ChallengeScreen extends StatefulWidget {
 
 class _ChallengeScreenState extends State<ChallengeScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _q1Controller = TextEditingController();
+  final _q2Controller = TextEditingController();
+
+  double _progress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Atualiza a barra de progresso conforme o usuário digita
+    _q1Controller.addListener(_updateProgress);
+    _q2Controller.addListener(_updateProgress);
+  }
+
+  @override
+  void dispose() {
+    _q1Controller.dispose();
+    _q2Controller.dispose();
+    super.dispose();
+  }
+
+  void _updateProgress() {
+    int filled = 0;
+    if (_q1Controller.text.trim().isNotEmpty) filled++;
+    if (_q2Controller.text.trim().isNotEmpty) filled++;
+    setState(() {
+      _progress = filled / 2.0; // 2 é o número total de perguntas
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,12 +61,12 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. Relógio / Tempo Restante
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    // ✅ era .withOpacity(0.4) — linha 41
                     color: AppColors.danger.withValues(alpha: 0.4),
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -59,26 +87,83 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                             fontWeight: FontWeight.bold,
                             color: Colors.white)),
                     Text('Responda antes que o tempo acabe',
-                        style:
-                            TextStyle(color: AppColors.danger, fontSize: 12)),
+                        style: TextStyle(color: AppColors.danger, fontSize: 12)),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
+
+              // 2. Selo de Recompensa
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: AppStyles.highlightDecoration(
+                  borderColor: AppColors.primary.withValues(alpha: 0.5),
+                  color: AppColors.primary.withValues(alpha: 0.05),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.stars, color: AppColors.primary, size: 32),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Recompensa do Desafio',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text('Acerte as questões para liberar seu palpite na rodada!',
+                              style: TextStyle(
+                                  color: AppColors.textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 3. Barra de Progresso Interativa
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('SEU PROGRESSO', style: AppStyles.tagStyle),
+                  Text('${(_progress * 100).toInt()}%',
+                      style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: _progress,
+                backgroundColor: AppColors.borderLight,
+                color: AppColors.primary,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              const SizedBox(height: 24),
+
               const Text('DESAFIO ANTI-VÍCIO', style: AppStyles.tagStyle),
               const Text('Pense antes de apostar',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
+
+              // 4. Perguntas
               _buildQuestion(
                 'PERGUNTA 1',
                 'Qual a % de apostadores que perdem a longo prazo?',
+                _q1Controller,
               ),
               const SizedBox(height: 16),
               _buildQuestion(
                 'PERGUNTA 2',
                 'Quantas substituições existem no futebol?',
+                _q2Controller,
               ),
               const SizedBox(height: 32),
+
+              // 5. Botão de Validação Original
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -92,7 +177,7 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Respostas validadas!')),
+                        const SnackBar(content: Text('Respostas validadas! Palpite liberado.')),
                       );
                     }
                   },
@@ -108,14 +193,14 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
     );
   }
 
-  Widget _buildQuestion(String tag, String question) {
+  Widget _buildQuestion(
+      String tag, String question, TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            // ✅ era .withOpacity(0.1) — linha 117
             color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -125,8 +210,9 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
         Text(question, style: const TextStyle(fontSize: 14)),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           validator: (value) {
-            if (value == null || value.isEmpty) {
+            if (value == null || value.trim().isEmpty) {
               return 'Campo obrigatório ou tempo esgotado';
             }
             return null;
@@ -138,6 +224,14 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary),
             ),
           ),
         ),
