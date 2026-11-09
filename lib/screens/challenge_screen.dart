@@ -1,8 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_styles.dart';
+import '../../core/services/user_service.dart';
+import '../../models/desafio.dart';
+import 'package:provider/provider.dart';
+import '../../models/user_provider.dart';
 
-/// Tela de Desafio Anti-Vício — Pedro
 class ChallengeScreen extends StatefulWidget {
   const ChallengeScreen({super.key});
 
@@ -12,33 +18,95 @@ class ChallengeScreen extends StatefulWidget {
 
 class _ChallengeScreenState extends State<ChallengeScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _q1Controller = TextEditingController();
-  final _q2Controller = TextEditingController();
+  final _respostaController = TextEditingController();
 
-  double _progress = 0.0;
+  Desafio? _desafio;
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  String? _erro;
+  String? _mensagemResultado;
+  bool? _acertou;
 
   @override
   void initState() {
     super.initState();
-    // Atualiza a barra de progresso conforme o usuário digita
-    _q1Controller.addListener(_updateProgress);
-    _q2Controller.addListener(_updateProgress);
+    _carregarDesafio();
   }
 
   @override
   void dispose() {
-    _q1Controller.dispose();
-    _q2Controller.dispose();
+    _respostaController.dispose();
     super.dispose();
   }
 
-  void _updateProgress() {
-    int filled = 0;
-    if (_q1Controller.text.trim().isNotEmpty) filled++;
-    if (_q2Controller.text.trim().isNotEmpty) filled++;
+  Future<void> _carregarDesafio() async {
     setState(() {
-      _progress = filled / 2.0; // 2 é o número total de perguntas
+      _isLoading = true;
+      _erro = null;
+      _mensagemResultado = null;
+      _acertou = null;
     });
+    try {
+      final userId = await UserService.getUserId();
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/desafios/aleatorio'),
+        headers: {'X-User-Id': userId},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _desafio = Desafio.fromMap(data);
+        });
+      } else {
+        setState(() => _erro = 'Erro ao carregar desafio.');
+      }
+    } catch (e) {
+      setState(() => _erro = 'Falha de conexão: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _responder() async {
+    if (!_formKey.currentState!.validate() || _desafio == null) return;
+    setState(() => _isSubmitting = true);
+
+    final userId = await UserService.getUserId();
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8080';
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/desafios/responder'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': userId,
+        },
+        body: jsonEncode({
+          'desafio_id': _desafio!.id,
+          'resposta': _respostaController.text.trim(),
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        setState(() {
+          _acertou = data['acertou'];
+          _mensagemResultado = data['mensagem'];
+        });
+        // Limpa o campo e opcionalmente carrega novo desafio
+        _respostaController.clear();
+
+        if (mounted) {
+          context.read<UserProvider>().fetchUserStatus();
+        }
+      } else {
+        setState(() => _erro = data['error'] ?? 'Erro ao responder.');
+      }
+    } catch (e) {
+      setState(() => _erro = 'Falha de conexão: $e');
+    } finally {
+      setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -49,193 +117,155 @@ class _ChallengeScreenState extends State<ChallengeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
-            Text('Desbloqueio de Palpite', style: TextStyle(fontSize: 18)),
-            Text('Jogue com consciência', style: AppStyles.appBarSubtitle),
+            Text('Desafio Anti-Vício', style: TextStyle(fontSize: 18)),
+            Text('Pense antes de apostar', style: AppStyles.appBarSubtitle),
           ],
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Relógio / Tempo Restante
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
+        actions: [
+          // Chip de pontos
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: AppColors.danger.withValues(alpha: 0.4),
-                  ),
+                  color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
-                  color: AppColors.surface,
-                ),
-                child: Column(
-                  children: const [
-                    Icon(Icons.timer, color: AppColors.danger, size: 40),
-                    SizedBox(height: 8),
-                    Text('TEMPO RESTANTE',
-                        style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 10,
-                            letterSpacing: 1.2)),
-                    Text('00:15',
-                        style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    Text('Responda antes que o tempo acabe',
-                        style: TextStyle(color: AppColors.danger, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 2. Selo de Recompensa
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: AppStyles.highlightDecoration(
-                  borderColor: AppColors.primary.withValues(alpha: 0.5),
-                  color: AppColors.primary.withValues(alpha: 0.05),
+                  border: Border.all(color: AppColors.primary),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.stars, color: AppColors.primary, size: 32),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Recompensa do Desafio',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('Acerte as questões para liberar seu palpite na rodada!',
-                              style: TextStyle(
-                                  color: AppColors.textSecondary, fontSize: 12)),
-                        ],
+                    const Icon(Icons.stars, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${context.watch<UserProvider>().pontos} pts',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // 3. Barra de Progresso Interativa
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('SEU PROGRESSO', style: AppStyles.tagStyle),
-                  Text('${(_progress * 100).toInt()}%',
-                      style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: _progress,
-                backgroundColor: AppColors.borderLight,
-                color: AppColors.primary,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              const SizedBox(height: 24),
-
-              const Text('DESAFIO ANTI-VÍCIO', style: AppStyles.tagStyle),
-              const Text('Pense antes de apostar',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 24),
-
-              // 4. Perguntas
-              _buildQuestion(
-                'PERGUNTA 1',
-                'Qual a % de apostadores que perdem a longo prazo?',
-                _q1Controller,
-              ),
-              const SizedBox(height: 16),
-              _buildQuestion(
-                'PERGUNTA 2',
-                'Quantas substituições existem no futebol?',
-                _q2Controller,
-              ),
-              const SizedBox(height: 32),
-
-              // 5. Botão de Validação Original
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          // Botão de recarregar
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _carregarDesafio,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _erro != null
+              ? Center(child: Text(_erro!))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Pergunta
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderLight),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.quiz,
+                                  color: AppColors.primary, size: 40),
+                              const SizedBox(height: 16),
+                              Text(
+                                _desafio!.pergunta,
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Campo de resposta
+                        TextFormField(
+                          controller: _respostaController,
+                          decoration: InputDecoration(
+                            hintText: 'Digite sua resposta',
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                                  ? 'Campo obrigatório'
+                                  : null,
+                        ),
+                        const SizedBox(height: 24),
+                        // Botão
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: _isSubmitting ? null : _responder,
+                            child: _isSubmitting
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text('Responder',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        // Feedback
+                        if (_mensagemResultado != null) ...[
+                          const SizedBox(height: 24),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: _acertou == true
+                                  ? AppColors.primary.withValues(alpha: 0.1)
+                                  : AppColors.danger.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: _acertou == true
+                                      ? AppColors.primary
+                                      : AppColors.danger),
+                            ),
+                            child: Text(
+                              _mensagemResultado!,
+                              style: TextStyle(
+                                color: _acertou == true
+                                    ? AppColors.primary
+                                    : AppColors.danger,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Respostas validadas! Palpite liberado.')),
-                      );
-                    }
-                  },
-                  child: const Text('Validar e Liberar Palpite',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuestion(
-      String tag, String question, TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(tag, style: AppStyles.tagStyle),
-        ),
-        const SizedBox(height: 8),
-        Text(question, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Campo obrigatório ou tempo esgotado';
-            }
-            return null;
-          },
-          decoration: InputDecoration(
-            hintText: 'Digite sua resposta',
-            filled: true,
-            fillColor: AppColors.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

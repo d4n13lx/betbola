@@ -3,7 +3,6 @@ import 'package:betbola/models/partida.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import adicionado
-import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/user_service.dart';
 
 class SoccerMatches extends ChangeNotifier {
@@ -41,7 +40,7 @@ class SoccerMatches extends ChangeNotifier {
       ];
     } catch (e) {
       erro = "Não foi possível carregar as partidas. O backend está rodando?";
-      print(e);
+      debugPrint(e.toString());
     }
 
     carregando = false;
@@ -67,7 +66,7 @@ class SoccerMatches extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Erro ao buscar apostas: $e');
+      debugPrint('Erro ao buscar apostas: $e');
     }
   }
 

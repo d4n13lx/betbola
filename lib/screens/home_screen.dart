@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/soccer_matches.dart';
+import '../models/user_provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/app_card.dart';
 import '../core/widgets/team_shield.dart';
@@ -59,16 +60,49 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.stars, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${context.watch<UserProvider>().pontos} pts',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Ícone de perfil corrigido
+          Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: Center(
               child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ProfileScreen(),
-                    ),
-                  );
+                        builder: (context) => const ProfileScreen()),
+                  ).then((_) {
+                    if (context.mounted) {
+                      context.read<UserProvider>().fetchUserStatus();
+                    }
+                  });
                 },
                 child: Container(
                   width: 45,
@@ -76,15 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primary,
-                      width: 2,
-                    ),
+                    border: Border.all(color: AppColors.primary, width: 2),
                   ),
-                  child: const Icon(
-                    Icons.person,
-                    color: AppColors.primary,
-                  ),
+                  child: const Icon(Icons.person, color: AppColors.primary),
                 ),
               ),
             ),

@@ -33,12 +33,55 @@ class BetController {
 
   // --- CREATE (Criar) ---
   static Future<Response> create(Request request) async {
-    final userId = request.context['userId'];
+    final userId = request.context['userId'] as String;
     final body = jsonDecode(await request.readAsString());
 
     try {
-      // 1. Verifica se a partida já começou (Regra de Negócio)
-      final match = await FootballApiService.getMatchById(body['partida_id']);
+      // 1. Buscar usuário e verificar pontos/bloqueio
+      var user = await _supabase
+          .from('usuarios')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (user == null) {
+        await _supabase.from('usuarios').insert({
+          'user_id': userId,
+          'pontos': 100,
+          'erros_consecutivos': 0,
+        });
+        user = await _supabase
+            .from('usuarios')
+            .select()
+            .eq('user_id', userId)
+            .single();
+      }
+
+      final pontos = user['pontos'] as int;
+      final bloqueadoAte = user['bloqueado_ate'] as String?;
+
+      if (bloqueadoAte != null &&
+          DateTime.parse(bloqueadoAte).isAfter(DateTime.now())) {
+        return Response.forbidden(
+          jsonEncode({
+            'error': 'Você está bloqueado. Aguarde para apostar novamente.',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (pontos < 5) {
+        return Response.badRequest(
+          body: jsonEncode({
+            'error':
+                'Pontos insuficientes. Participe de desafios para ganhar mais.',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      // 2. Verifica se a partida já começou
+      final match = await FootballApiService.getMatchById(
+        body['partida_id'] as int,
+      );
       if (match['status'] != 'Agendada') {
         return Response.badRequest(
           body: jsonEncode({
@@ -47,8 +90,13 @@ class BetController {
           headers: {'content-type': 'application/json'},
         );
       }
+      // 3. Debita 5 pontos do usuário
+      await _supabase
+          .from('usuarios')
+          .update({'pontos': pontos - 5})
+          .eq('user_id', userId);
 
-      // 2. Insere no Supabase
+      // 4. Insere a previsão
       final response = await _supabase
           .from('previsoes')
           .insert({
@@ -59,7 +107,7 @@ class BetController {
             'escudo_casa': match['time_mandante']['escudo'],
             'escudo_fora': match['time_visitante']['escudo'],
             'rodada': match['campeonato']['rodada'] ?? 0,
-            'previsao': body['previsao'], // 'casa', 'empate', 'fora'
+            'previsao': body['previsao'],
             'status': 'pendente',
             'pontos': 0,
           })
@@ -92,7 +140,6 @@ class BetController {
     final body = jsonDecode(await request.readAsString());
 
     try {
-      // Atualiza apenas se a previsão pertencer ao usuário
       final response = await _supabase
           .from('previsoes')
           .update({
@@ -141,7 +188,6 @@ class BetController {
     final userId = request.context['userId'] as String;
 
     try {
-      // 1. Busca previsões pendentes do usuário no Supabase
       final bets = await _supabase
           .from('previsoes')
           .select()
@@ -155,31 +201,29 @@ class BetController {
       }
 
       int conferidas = 0;
+      int pontosGanhosTotal = 0;
 
-      // 2. Itera sobre cada previsão pendente
       for (var bet in bets) {
-        // Consulta a API-Futebol para ver o resultado atual
-        final match = await FootballApiService.getMatchById(bet['partida_id']);
+        final match = await FootballApiService.getMatchById(
+          bet['partida_id'] as int,
+        );
 
-        // Só processa se a partida estiver encerrada
         if (match['status'] == 'Encerrada') {
           int pontos = 0;
-          final previsao = bet['previsao'];
-          final placarCasa = match['placar_mandante'] ?? 0;
-          final placarFora = match['placar_visitante'] ?? 0;
+          final previsao = bet['previsao'] as String;
+          final placarCasa = (match['placar_mandante'] as int?) ?? 0;
+          final placarFora = (match['placar_visitante'] as int?) ?? 0;
 
-          // Lógica de Pontuação (Baseada no Documento de Planejamento)
           if (placarCasa == placarFora && previsao == 'empate') {
-            pontos = 5; // Acertou empate (+5)
+            pontos = 5;
           } else if (placarCasa > placarFora && previsao == 'casa') {
-            pontos = 3; // Acertou vencedor mandante (+3)
+            pontos = 3;
           } else if (placarCasa < placarFora && previsao == 'fora') {
-            pontos = 3; // Acertou vencedor visitante (+3)
+            pontos = 3;
           }
 
           final statusFinal = pontos > 0 ? 'acertou' : 'errou';
 
-          // 3. Atualiza no Supabase (PATCH)
           await _supabase
               .from('previsoes')
               .update({
@@ -190,14 +234,32 @@ class BetController {
               })
               .eq('id', bet['id']);
 
+          if (pontos > 0) {
+            pontosGanhosTotal += pontos;
+          }
           conferidas++;
         }
+      }
+
+      // Credita pontos ganhos ao usuário
+      if (pontosGanhosTotal > 0) {
+        final user = await _supabase
+            .from('usuarios')
+            .select()
+            .eq('user_id', userId)
+            .single();
+        final pontosAtuais = user['pontos'] as int;
+        await _supabase
+            .from('usuarios')
+            .update({'pontos': pontosAtuais + pontosGanhosTotal})
+            .eq('user_id', userId);
       }
 
       return Response.ok(
         jsonEncode({
           'message': 'Conferência concluída!',
           'processadas': conferidas,
+          'pontos_ganhos': pontosGanhosTotal,
         }),
         headers: {'content-type': 'application/json'},
       );

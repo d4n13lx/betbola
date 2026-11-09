@@ -47,8 +47,7 @@ class _DetailScreenState extends State<DetailScreen> {
       if (apostaSalva == 'casa') selectedBet = 'Mandante';
       if (apostaSalva == 'empate') selectedBet = 'Empate';
       if (apostaSalva == 'fora') selectedBet = 'Visitante';
-    } else if (selectedBet == null) {
-      selectedBet = 'Mandante'; // Valor inicial
+      selectedBet ??= 'Mandante'; // Valor inicial
     }
 
     return Scaffold(
@@ -90,8 +89,11 @@ class _DetailScreenState extends State<DetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    jaApostou ? 'Sua aposta nesta partida:' : 'Escolha seu palpite:',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    jaApostou
+                        ? 'Sua aposta nesta partida:'
+                        : 'Escolha seu palpite:',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
 
@@ -180,7 +182,8 @@ class _DetailScreenState extends State<DetailScreen> {
     return Row(
       children: _betOptions.map((option) {
         final isSelected = selectedBet == option;
-        final isFaded = isLocked && !isSelected; // Esmaece os que não foram escolhidos
+        final isFaded =
+            isLocked && !isSelected; // Esmaece os que não foram escolhidos
 
         return Expanded(
           child: GestureDetector(
@@ -195,12 +198,12 @@ class _DetailScreenState extends State<DetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.15)
-                    : AppColors.surface,
+                    ? AppColors.primary
+                    : (isFaded ? Colors.transparent : AppColors.surfaceLight),
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primary
-                      : (isFaded ? Colors.transparent : AppColors.surfaceLight ?? AppColors.border),
+                      : (isFaded ? Colors.transparent : AppColors.surfaceLight),
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(16),
@@ -209,17 +212,21 @@ class _DetailScreenState extends State<DetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isSelected) ...[
-                    const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+                    const Icon(Icons.check_circle,
+                        color: AppColors.primary, size: 20),
                     const SizedBox(height: 8),
                   ],
                   Text(
                     option,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w500,
                       color: isSelected
                           ? AppColors.primary
-                          : (isFaded ? AppColors.textSecondary.withValues(alpha: 0.3) : AppColors.textSecondary),
+                          : (isFaded
+                              ? AppColors.textSecondary.withValues(alpha: 0.3)
+                              : AppColors.textSecondary),
                     ),
                   ),
                 ],
@@ -239,23 +246,24 @@ class _DetailScreenState extends State<DetailScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         onPressed: _isSubmitting ? null : () => _submitBet(provider),
         child: _isSubmitting
-          ? const SizedBox(
-              height: 24,
-              width: 24,
-              child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3)
-            )
-          : Text(
-              'Apostar no $selectedBet',
-              style: const TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                    color: Colors.black, strokeWidth: 3))
+            : Text(
+                'Apostar no $selectedBet',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
-            ),
       ),
     );
   }
@@ -292,13 +300,15 @@ class _DetailScreenState extends State<DetailScreen> {
             const SnackBar(
               content: Text('Palpite salvo com sucesso! Boa sorte!'),
               backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating, // Flutua na tela, fica mais moderno
+              behavior: SnackBarBehavior
+                  .floating, // Flutua na tela, fica mais moderno
             ),
           );
           Navigator.pop(context);
         }
       } else {
-        final erro = jsonDecode(response.body)['error'] ?? 'Erro ao salvar aposta';
+        final erro =
+            jsonDecode(response.body)['error'] ?? 'Erro ao salvar aposta';
         throw Exception(erro);
       }
     } catch (e) {

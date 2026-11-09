@@ -2,6 +2,7 @@ import 'package:betbola/models/soccer_matches.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'models/user_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'screens/home_screen.dart';
 import 'screens/challenge_screen.dart';
@@ -12,8 +13,12 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => SoccerMatches(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SoccerMatches()),
+        ChangeNotifierProvider(
+            create: (_) => UserProvider()..fetchUserStatus()),
+      ],
       child: const BetNaBolaApp(),
     ),
   );
