@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../core/services/api_service.dart';
 import '../core/services/user_service.dart';
 import '../core/theme/app_colors.dart';
@@ -7,8 +8,8 @@ import '../core/widgets/app_card.dart';
 import '../core/widgets/team_shield.dart';
 import '../models/partida.dart';
 import '../models/soccer_matches.dart';
+import '../models/user_provider.dart';
 
-/// Tela de detalhes de uma partida e realização de aposta.
 class DetailScreen extends StatefulWidget {
   final Partida match;
   final String? currentBet;
@@ -32,10 +33,17 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final apostaSalva = context.read<SoccerMatches>().userBets[widget.match.id];
-    if (apostaSalva != null) {
+  Widget build(BuildContext context) {
+    final matchesProvider = context.watch<SoccerMatches>();
+    final user = context.watch<UserProvider>();
+    final apostaSalva = matchesProvider.userBets[widget.match.id];
+    final jaApostou = apostaSalva != null;
+
+    final isAgendada = widget.match.status == 'Agendada';
+    final isAoVivo = widget.match.status == 'Em andamento';
+    final isEncerrada = widget.match.status == 'Encerrada';
+
+    if (jaApostou) {
       final novo = apostaSalva == 'casa'
           ? 'Mandante'
           : apostaSalva == 'empate'
@@ -47,13 +55,6 @@ class _DetailScreenState extends State<DetailScreen> {
         });
       }
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final matchesProvider = context.watch<SoccerMatches>();
-    final apostaSalva = matchesProvider.userBets[widget.match.id];
-    final jaApostou = apostaSalva != null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -76,16 +77,19 @@ class _DetailScreenState extends State<DetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMatchCard(),
-                  const SizedBox(height: 32),
+                  _buildStatusBanner(isAgendada, isAoVivo, isEncerrada),
+                  const SizedBox(height: 16),
+                  _buildMatchCard(isAoVivo || isEncerrada),
+                  const SizedBox(height: 16),
+                  if (isAgendada && !jaApostou) _buildRegrasCard(user.pontos),
+                  const SizedBox(height: 16),
                   Text(
                     jaApostou ? 'PALPITE REGISTRADO' : 'SEU JOGO, SUA ESCOLHA',
                     style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -96,16 +100,38 @@ class _DetailScreenState extends State<DetailScreen> {
                         fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  _buildBetSelector(jaApostou),
+                  _buildBetSelector(jaApostou || !isAgendada),
                 ],
               ),
             ),
           ),
-          if (!jaApostou)
+          if (!jaApostou && isAgendada)
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: _buildSaveButton(matchesProvider),
+                child: _buildSaveButton(matchesProvider, user),
+              ),
+            )
+          else if (!jaApostou)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.danger),
+                  ),
+                  child: Text(
+                    isAoVivo
+                        ? '⏱️ Partida em andamento — não é possível apostar'
+                        : '🔒 Partida encerrada — não é possível apostar',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AppColors.danger, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ),
         ],
@@ -113,7 +139,105 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildMatchCard() {
+  Widget _buildStatusBanner(bool isAgendada, bool isAoVivo, bool isEncerrada) {
+    final color = isAoVivo
+        ? Colors.red
+        : isEncerrada
+            ? Colors.grey
+            : AppColors.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isAoVivo
+                ? Icons.play_circle_filled
+                : isEncerrada
+                    ? Icons.lock
+                    : Icons.schedule,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(widget.match.status,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegrasCard(int pontos) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text('REGRAS DA APOSTA',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildRegra('Custo da aposta:', '-5 pontos'),
+          const SizedBox(height: 6),
+          _buildRegra('Acertar o vencedor:', '+3 pontos'),
+          const SizedBox(height: 6),
+          _buildRegra('Acertar empate:', '+5 pontos'),
+          const Divider(color: AppColors.border, height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Seu saldo:', style: TextStyle(fontSize: 14)),
+              Text('$pontos pontos',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color:
+                          pontos >= 5 ? AppColors.primary : AppColors.danger)),
+            ],
+          ),
+          if (pontos < 5) ...[
+            const SizedBox(height: 8),
+            Text('⚠️ Você não tem pontos suficientes. Participe de desafios.',
+                style: TextStyle(color: AppColors.danger, fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegra(String label, String valor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        Text(valor,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      ],
+    );
+  }
+
+  Widget _buildMatchCard(bool isFinalizado) {
     return AppCard(
       radius: 20,
       child: Padding(
@@ -142,14 +266,19 @@ class _DetailScreenState extends State<DetailScreen> {
                     type: 'Mandante',
                   ),
                 ),
-                const Column(
+                Column(
                   children: [
-                    Text('VS',
-                        style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 24,
-                            fontStyle: FontStyle.italic)),
+                    Text(
+                      isFinalizado
+                          ? '${widget.match.placarMandante} - ${widget.match.placarVisitante}'
+                          : 'VS',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: isFinalizado ? 32 : 24,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ),
                 Expanded(
@@ -173,6 +302,7 @@ class _DetailScreenState extends State<DetailScreen> {
       children: _betOptions.map((option) {
         final isSelected = _selectedBet == option;
         final isFaded = isLocked && !isSelected;
+
         return Expanded(
           child: GestureDetector(
             onTap: () {
@@ -186,7 +316,7 @@ class _DetailScreenState extends State<DetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary
+                    ? AppColors.primary.withValues(alpha: 0.15)
                     : (isFaded ? Colors.transparent : AppColors.surfaceLight),
                 border: Border.all(
                   color: isSelected
@@ -224,18 +354,21 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildSaveButton(SoccerMatches provider) {
+  Widget _buildSaveButton(SoccerMatches provider, UserProvider user) {
+    final podeApostar = user.pontos >= 5;
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor:
+              podeApostar ? AppColors.primary : AppColors.surfaceLight,
           elevation: 0,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        onPressed: _isSubmitting ? null : () => _submitBet(provider),
+        onPressed:
+            (_isSubmitting || !podeApostar) ? null : () => _submitBet(provider),
         child: _isSubmitting
             ? const SizedBox(
                 height: 24,
@@ -244,9 +377,11 @@ class _DetailScreenState extends State<DetailScreen> {
                     color: Colors.black, strokeWidth: 3),
               )
             : Text(
-                'Apostar no $_selectedBet',
-                style: const TextStyle(
-                    color: Colors.black,
+                podeApostar
+                    ? 'Apostar no $_selectedBet (-5 pts)'
+                    : 'Sem pontos suficientes',
+                style: TextStyle(
+                    color: podeApostar ? Colors.black : AppColors.textSecondary,
                     fontWeight: FontWeight.bold,
                     fontSize: 16),
               ),
@@ -255,6 +390,7 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _submitBet(SoccerMatches provider) async {
+    if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
     String previsaoFormatada = 'casa';
@@ -273,9 +409,10 @@ class _DetailScreenState extends State<DetailScreen> {
       );
       provider.addBet(widget.match.id, previsaoFormatada);
       if (mounted) {
+        context.read<UserProvider>().fetchUserStatus();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Palpite salvo com sucesso!'),
+            content: Text('Palpite salvo! -5 pontos.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -310,7 +447,7 @@ class _TeamInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TeamShield(escudo: escudo, size: 75),
+        TeamShield(escudo: escudo, name: name, size: 75), // ← name: name,
         const SizedBox(height: 12),
         Text(name,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),

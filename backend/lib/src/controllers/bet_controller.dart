@@ -10,7 +10,6 @@ class BetController {
   static SupabaseClient get _supabase =>
       SupabaseClient(Env.supabaseUrl, Env.supabaseKey);
 
-  // --- READ (Listar) ---
   static Future<Response> getAll(Request request) async {
     final userId = request.context['userId'] as String;
     try {
@@ -31,13 +30,24 @@ class BetController {
     }
   }
 
-  // --- CREATE (Criar) com transação atômica ---
   static Future<Response> create(Request request) async {
     final userId = request.context['userId'] as String;
     final body = jsonDecode(await request.readAsString());
 
     try {
-      // 1. Buscar usuário e verificar bloqueio
+      final partidaId = body['partida_id'];
+      final previsao = body['previsao'] as String?;
+
+      if (partidaId == null || previsao == null || previsao.isEmpty) {
+        return Response.badRequest(
+          body: jsonEncode({
+            'error': 'partida_id e previsao são obrigatórios.',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+
+      // 1. Verificar bloqueio do usuário
       var user = await _supabase
           .from('usuarios')
           .select()
@@ -58,39 +68,58 @@ class BetController {
       }
 
       final bloqueadoAte = user['bloqueado_ate'] as String?;
-      if (bloqueadoAte != null &&
-          DateTime.parse(bloqueadoAte).isAfter(DateTime.now())) {
-        return Response.forbidden(
-          jsonEncode({'error': 'Você está bloqueado. Aguarde.'}),
-          headers: {'content-type': 'application/json'},
-        );
+      if (bloqueadoAte != null) {
+        final parsed = DateTime.tryParse(bloqueadoAte);
+        if (parsed != null && parsed.isAfter(DateTime.now())) {
+          return Response.forbidden(
+            jsonEncode({
+              'error': 'Você está bloqueado. Aguarde para apostar novamente.',
+            }),
+            headers: {'content-type': 'application/json'},
+          );
+        }
       }
 
-      // 2. Verifica status da partida
-      final match = await FootballApiService.getMatchById(
-        body['partida_id'] as int,
-      );
-      if (match['status'] != 'Agendada') {
+      // 2. Verificar status da partida
+      final match = await FootballApiService.getMatchById(partidaId as int);
+      final status = match['status'] as String?;
+
+      if (status == 'Em andamento') {
         return Response.badRequest(
           body: jsonEncode({
-            'error': 'Não é possível apostar em partidas já iniciadas ou encerradas.',
+            'error':
+                'Partida em andamento. Aguarde o encerramento para conferir.',
           }),
           headers: {'content-type': 'application/json'},
         );
       }
+      if (status == 'Encerrada') {
+        return Response.badRequest(
+          body: jsonEncode({
+            'error': 'Partida já encerrada. Não é possível apostar.',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (status != 'Agendada') {
+        return Response.badRequest(
+          body: jsonEncode({'error': 'Status desconhecido da partida.'}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
 
-      // 3. Chama a função SQL atômica
+      // 3. Chamar a função SQL atômica (debita 5 pontos + insere previsão)
       final result = await _supabase.rpc(
         'criar_previsao_atomica',
         params: {
           'p_user_id': userId,
-          'p_partida_id': body['partida_id'],
+          'p_partida_id': partidaId,
           'p_time_casa': match['time_mandante']['nome_popular'],
           'p_time_fora': match['time_visitante']['nome_popular'],
           'p_escudo_casa': match['time_mandante']['escudo'],
           'p_escudo_fora': match['time_visitante']['escudo'],
           'p_rodada': match['campeonato']['rodada'] ?? 0,
-          'p_previsao': body['previsao'],
+          'p_previsao': previsao,
         },
       );
 
@@ -109,7 +138,7 @@ class BetController {
           headers: {'content-type': 'application/json'},
         );
       }
-      if (msg.contains('23505')) {
+      if (msg.contains('23505') || msg.contains('duplicate')) {
         return Response.badRequest(
           body: jsonEncode({
             'error': 'Você já fez uma previsão para esta partida.',
@@ -121,7 +150,6 @@ class BetController {
     }
   }
 
-  // --- UPDATE (Editar) ---
   static Future<Response> update(Request request, String id) async {
     final userId = request.context['userId'] as String;
     final body = jsonDecode(await request.readAsString());
@@ -149,7 +177,6 @@ class BetController {
     }
   }
 
-  // --- DELETE (Excluir) ---
   static Future<Response> delete(Request request, String id) async {
     final userId = request.context['userId'] as String;
 
@@ -170,7 +197,6 @@ class BetController {
     }
   }
 
-  // --- CHECK RESULTS (Conferir e Calcular Pontuação) ---
   static Future<Response> checkResults(Request request) async {
     final userId = request.context['userId'] as String;
 
@@ -191,11 +217,13 @@ class BetController {
       int pontosGanhosTotal = 0;
 
       for (var bet in bets) {
-        final match = await FootballApiService.getMatchById(
-          bet['partida_id'] as int,
-        );
+        try {
+          final match = await FootballApiService.getMatchById(
+            bet['partida_id'] as int,
+          );
 
-        if (match['status'] == 'Encerrada') {
+          if (match['status'] != 'Encerrada') continue;
+
           int pontos = 0;
           final previsao = bet['previsao'] as String;
           final placarCasa = (match['placar_mandante'] as int?) ?? 0;
@@ -223,6 +251,8 @@ class BetController {
 
           if (pontos > 0) pontosGanhosTotal += pontos;
           conferidas++;
+        } catch (e) {
+          print('⚠️ Erro ao conferir previsão ${bet['id']}: $e');
         }
       }
 
@@ -248,6 +278,7 @@ class BetController {
         headers: {'content-type': 'application/json'},
       );
     } catch (e) {
+      print('❌ Erro no checkResults: $e');
       return Response.internalServerError(
         body: jsonEncode({'error': e.toString()}),
       );
